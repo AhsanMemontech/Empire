@@ -1,3 +1,5 @@
+"use client";
+
 const bodyHtml = `
 
 <div class="wrap">
