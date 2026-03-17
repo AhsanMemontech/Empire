@@ -212,3 +212,37 @@ body::after {
 }
 
 .hidden { display: none !important; }
+
+.strategy-step {
+  position: relative;
+  padding-left: 30px;
+  margin-bottom: 30px;
+  border-left: 1px solid rgba(212, 168, 67, 0.2);
+}
+
+.strategy-step::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--gold);
+}
+
+.step-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.step-body {
+  font-size: 15px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.5;
+}

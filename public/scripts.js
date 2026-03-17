@@ -32,26 +32,39 @@ function handleCSVUpload(event) {
 }
 
 function showStep(n) {
-  const steps = ['step-intake', 'loading', 'step-confirm', 'step-personas'];
+  // We added 'step-strategy', so the list must match exactly
+  const sectionIds = ['step-intake', 'loading', 'step-confirm', 'step-personas', 'step-strategy'];
   
-  // Hide all
-  steps.forEach(id => {
+  // Hide all sections
+  sectionIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
   });
 
-  // Show target
-  const targetId = steps[n - 1];
+  // Show the current step
+  const targetId = sectionIds[n - 1];
   const targetEl = document.getElementById(targetId);
-  if (targetEl) targetEl.classList.remove('hidden');
+  if (targetEl) {
+    targetEl.classList.remove('hidden');
+    // Scroll to top so the user sees the new content
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
-  // Update Progress Dots (Minimalist Logic)
-  const dots = document.querySelectorAll('.prog-step');
-  dots.forEach((dot, idx) => {
-    dot.classList.remove('active', 'done');
-    if (idx + 1 < n) dot.classList.add('done');
-    if (idx + 1 === n) dot.classList.add('active');
-  });
+  // Update Progress Track Highlights
+  for (let i = 1; i <= 5; i++) {
+    const stepEl = document.getElementById('prog-' + i);
+    if (stepEl) {
+      if (i === n) {
+        stepEl.classList.add('active');
+        stepEl.classList.remove('done');
+      } else if (i < n) {
+        stepEl.classList.add('done');
+        stepEl.classList.remove('active');
+      } else {
+        stepEl.classList.remove('active', 'done');
+      }
+    }
+  }
 }
 
 let loaderInterval;
@@ -84,16 +97,27 @@ async function startResearch() {
 
   startLoader();
 
-  const systemPrompt = `You are a Senior Market Research Analyst. Return valid JSON only. Structure: {"market_overview": "...", "research_sections": [{"source": "...", "findings": ["..."], "relevance": "..."}], "segment_hypotheses": [{"label": "...", "description": "..."}]}`;
+  const systemPrompt = `You are a Senior Industry Strategist. 
+    Your goal is to find "Hidden Winners" based on provided data.
+    Return valid JSON only in this format:
+    {
+      "market_overview": "...",
+      "hidden_winners": [
+        {"segment": "...", "average_deal_value": "...", "reason": "..."}
+      ]
+    }`;
   
-  // Note: Using getVal ensures we don't crash if Edward removed "Competitors" or "Hypothesis" from the UI
-  const userPrompt = `
-    Business: ${desc}
-    Industry: ${getVal('industry')}
-    Price: ${getVal('price-point')}
-    Geo: ${chipSelections.geo}
-    CRM DATA: ${crmContext}
-    Research this market and highlight "Hidden Winners".`;
+    const userPrompt = `
+    ACT AS: A Lead Consultant for a ${getVal('industry')} firm.
+    BUSINESS CONTEXT: ${getVal('biz-description')}
+    PRICING STRATEGY: ${getVal('price-point')}
+    
+    DATASET FOR ANALYSIS: 
+    ${crmContext || "No CRM data. Use market research for " + getVal('industry')}
+  
+    TASK: 
+    Analyze this specific business. Find the "Hidden Winner" (the customer that pays the most or has the highest strategic value). 
+    Justify why this segment is the best choice for a ${getVal('price-point')} offer.`;
 
   try {
     const res = await callClaude(systemPrompt, userPrompt);
@@ -110,136 +134,190 @@ async function startResearch() {
 
 function renderResearch(data) {
   const container = document.getElementById('research-panels');
+  if (!container) return;
+
+  // 1. Universal Data Detector
+  const overview = data.market_overview || data.overview || "High-value segments identified within your CRM data.";
   
-  // 1. Clear and Add Executive Overview with a "Glass" look
+  // Look for any version of the winners list
+  const sections = data.hidden_winners || data.hiddenWinners || data.research_sections || data.sections || [];
+
   container.innerHTML = `
     <div style="text-align: left; margin-bottom: 60px; padding: 40px; background: rgba(255,255,255,0.02); border-left: 2px solid var(--gold); border-radius: 0 20px 20px 0;">
       <div class="field-label" style="color: var(--gold)">Intelligence Synthesis</div>
-      <h2 style="font-family: var(--serif); font-size: 32px; margin-bottom: 20px; text-transform: uppercase;">Executive Overview</h2>
-      <p style="font-size: 18px; line-height: 1.6; font-weight: 300; color: rgba(255,255,255,0.8)">${data.market_overview}</p>
+      <h2 style="font-family: var(--serif); font-size: 32px; margin-bottom: 20px; text-transform: uppercase;">Empire Executive Overview</h2>
+      <p style="font-size: 18px; line-height: 1.6; font-weight: 300; color: rgba(255,255,255,0.8)">${overview}</p>
     </div>
-    
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;" id="research-grid"></div>
   `;
 
   const grid = document.getElementById('research-grid');
+  
+  if (sections.length === 0) {
+    grid.innerHTML = `<div style="grid-column: span 2; opacity: 0.5; padding: 20px; border: 1px dashed rgba(255,255,255,0.1);">Analysis complete. Proceed to Persona generation.</div>`;
+    return;
+  }
 
-  // 2. Map Findings into a sleek 2-column grid
-  data.research_sections.forEach((s, i) => {
+  sections.forEach((s, i) => {
+    // 2. THE FIX: Prioritize 'reason' or 'description' if 'findings' is missing
+    const detailText = s.reason || s.description || (Array.isArray(s.findings) ? s.findings[0] : "High-value target identified.");
+    const valDisplay = s.average_deal_value ? `<div style="color: var(--gold); font-weight: bold; margin-bottom: 10px; font-size: 18px;">Value: ${s.average_deal_value}</div>` : "";
+    
     grid.innerHTML += `
-      <div class="research-card" style="text-align: left; padding: 30px; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(255,255,255,0.01);">
+      <div class="research-card" style="text-align: left; padding: 30px; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(255,255,255,0.01); position: relative; overflow: hidden;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-          <span class="field-label" style="margin: 0;">${s.source}</span>
-          <input type="checkbox" id="check-${i}" checked style="accent-color: var(--gold);">
+          <span class="field-label" style="margin: 0;">${s.segment || s.source || 'Segment'}</span>
+          <input type="checkbox" id="check-${i}" checked style="accent-color: var(--gold); cursor: pointer; transform: scale(1.3);">
         </div>
-        
-        <ul style="list-style: none; padding: 0; margin-bottom: 20px;">
-          ${s.findings.map(f => `
-            <li style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.6); margin-bottom: 12px; padding-left: 15px; border-left: 1px solid rgba(212,168,67,0.3);">
-              ${f}
-            </li>
-          `).join('')}
-        </ul>
-        
-        <div style="font-size: 10px; font-family: var(--mono); color: var(--gold); opacity: 0.8; letter-spacing: 0.1em; text-transform: uppercase;">
-          Relevance: ${s.relevance}
-        </div>
+        ${valDisplay}
+        <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7); font-weight: 300;">
+          ${detailText}
+        </p>
       </div>
     `;
   });
 }
 
 async function buildPersonas() {
-  startLoader();
-  document.getElementById('loader-stage').innerText = "BUILDING PERSONAS";
+  startLoader("BUILDING PERSONAS");
+  const count = chipSelections.count ? chipSelections.count[0] : "3";
   
-  const confirmed = researchData.research_sections.filter((_,i) => document.getElementById('check-'+i).checked);
-  const count = chipSelections.count[0];
+  const systemPrompt = `You are a B2B Growth Strategist for ${getVal('industry')}. 
+  Based on the Research, create 3 detailed Professional Personas. 
+  Focus ONLY on business decision-makers (CEOs, Founders, Ops Directors). 
+  Do not create consumer/lifestyle personas unless the business is B2C. 
+  Return valid JSON.`;
+  const userPrompt = `Build ${count} vivid personas based on research. Use real titles. JSON only.`;
   
-  const systemPrompt = `Return JSON only: {"personas": [{"name": "...", "segment_name": "...", "role": "...", "emoji": "...", "summary": "...", "jtbd": "...", "goals": [], "pain_points": [], "motivations": "...", "buying_triggers": "...", "objections": "...", "messaging_angle": "...", "ad_targeting_notes": "...", "voice_quote": "..."}]}`;
-  const userPrompt = `Build ${count} vivid personas based on this confirmed research: ${JSON.stringify(confirmed)}`;
-
   try {
     const res = await callClaude(systemPrompt, userPrompt);
     clearInterval(loaderInterval);
-    personas = res.personas;
+    const rawList = res.personas || res.profiles || res.decision_makers || (Array.isArray(res) ? res : []);
+    personas = rawList;
+    if (window.setPersonaState) {
+      window.setPersonaState(rawList);
+    }
     renderPersonas();
     showStep(4);
-  } catch(e) {
+  } catch (e) {
     clearInterval(loaderInterval);
-    alert(e.message);
+    alert("Persona build failed. Check console.");
     showStep(3);
   }
 }
 
 function renderPersonas() {
-  const container = document.getElementById('persona-list');
-  container.innerHTML = personas.map((p, i) => `
-    <div class="persona-card" style="border-top: 1px solid var(--border); padding-top: 60px; margin-bottom: 100px;">
+  const container = document.getElementById('persona-grid');
+  if (!container) {
+    console.error("Could not find persona-grid container");
+    return;
+  }
+
+  // Handle case where personas might be an object containing an array
+  const list = Array.isArray(personas) ? personas : (personas.personas || personas.profiles || []);
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="color: white; opacity: 0.5;">No personas generated. Try again.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(p => `
+    <div class="persona-card" style="text-align: left; padding: 30px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;">
+      <div class="field-label" style="color: var(--gold)">${p.title || p.role || p.type || 'Decision Maker'}</div>
+      <h3 style="font-family: var(--serif); font-size: 24px; margin-bottom: 10px; color: #fff;">${p.name || p.persona_name || 'Executive Profile'}</h3>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 20px; line-height: 1.5;">${p.bio || p.summary || p.description || ''}</p>
       
-      <div class="persona-header" style="margin-bottom: 40px;">
-        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.3em; color: var(--gold); margin-bottom: 8px;">
-          ${p.segment_name || 'Target Segment'}
-        </div>
-        <h2 style="font-family: var(--serif); font-size: 48px; text-transform: uppercase; line-height: 1;">
-          ${p.name}
-        </h2>
-        <p style="color: var(--muted); font-size: 16px; margin-top: 8px;">${p.role}</p>
+      <div style="margin-bottom: 20px;">
+        <span class="field-label" style="font-size: 10px; opacity: 0.7;">Pain Points</span>
+        <ul style="list-style: none; padding: 0; font-size: 13px; color: rgba(255,255,255,0.7);">
+          ${(Array.isArray(p.pain_points || p.challenges) ? (p.pain_points || p.challenges) : []).map(pt => `<li style="margin-bottom: 5px;">• ${pt}</li>`).join('')}
+        </ul>
       </div>
 
-      <div class="persona-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px 40px;">
-        
-        <div class="persona-item" style="grid-column: span 2;">
-          <label class="field-label">Executive Summary</label>
-          <div style="font-size: 18px; font-weight: 300; line-height: 1.6; color: rgba(255,255,255,0.8)">${p.summary}</div>
-        </div>
-
-        <div class="persona-item">
-          <label class="field-label">Pain Points</label>
-          <ul style="list-style: none; padding: 0; color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.8;">
-            ${p.pain_points.map(pt => `<li>— ${pt}</li>`).join('')}
-          </ul>
-        </div>
-
-        <div class="persona-item">
-          <label class="field-label">Messaging Angle</label>
-          <div style="font-size: 14px; line-height: 1.6; color: var(--gold); italic">${p.messaging_angle}</div>
-        </div>
-
-      </div>
-
-      <div style="margin-top: 60px; padding: 40px; background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px inset rgba(255,255,255,0.05);">
-        <div style="font-family: var(--serif); font-size: 32px; line-height: 1.2; font-style: italic; color: #fff;">
-          "${p.voice_quote}"
-        </div>
+      <div style="padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05);">
+        <span class="field-label" style="font-size: 10px; opacity: 0.7;">The Hook</span>
+        <p style="font-style: italic; font-size: 13px; color: var(--gold);">"${p.hook || p.messaging_angle || p.quote || 'Strategy pending...'}"</p>
       </div>
     </div>
   `).join('');
-  
-  const countDisplay = document.getElementById('persona-count-display');
-  if (countDisplay) countDisplay.innerText = `${personas.length} Intelligence Profiles Active`;
 }
 
-async function callClaude(sys, user) {
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ 
-      system: sys, 
-      user 
+// --- NEW STRATEGY LOGIC ---
+window.generateStrategy = async function() {
+  startLoader("SYNTHESIZING STRATEGY");
+  
+  // 1. DYNAMIC EXTRACTION: Find the winner from the previous research step
+  const winnersList = researchData.hidden_winners || researchData.hiddenWinners || [];
+  const topWinner = winnersList[0] || { segment: "High-Value Target", average_deal_value: "Premium" };
+  
+  const winnerName = topWinner.segment;
+  const winnerValue = topWinner.average_deal_value || topWinner.value || "Premium";
+
+  const systemPrompt = `You are the Lead Strategist at Empire of Ideas. 
+    Return valid JSON. Structure the "content_plan" as an array of objects: 
+    {"content_plan": [{"phase": "Authority Building", "task": "..."}, {"phase": "Lead Capture", "task": "..."}, {"phase": "Conversion", "task": "..."}]}`;
+
+  // 2. CONTEXTUAL PROMPT: No more hard-coded "Operations Manager"
+  const userPrompt = `
+    INDUSTRY: ${getVal('industry')}
+    RESEARCH DATA: ${JSON.stringify(researchData)}
+    PERSONAS: ${JSON.stringify(personas)}
+
+    STRATEGY GOAL:
+    Based on the "${winnerName}" being the ${winnerValue} Hidden Winner:
+    1. Identify a 'Messaging Hook' that justifies a ${winnerValue} price point for this specific industry.
+    2. Create a 30-day content plan to attract more of these ${winnerName} leads.
+    3. Return the results in the requested JSON format.`;
+  
+  try {
+    const res = await callClaude(systemPrompt, userPrompt);
+    clearInterval(loaderInterval);
+    
+    // This ensures the React UI in page.tsx gets the fresh SaaS/Accounting data
+    if (window.setStrategyState) {
+      window.setStrategyState(res);
+    }
+    
+    showStep(5);
+  } catch (e) {
+    clearInterval(loaderInterval);
+    alert("Strategy generation failed.");
+    showStep(4);
+  }
+};
+
+window.copyStrategy = function() {
+  const winner = document.querySelector('#strategy-module h2 span')?.innerText || "Operations Manager";
+  const hook = document.querySelector('.persona-item div i')?.innerText || "";
+  const roadmap = Array.from(document.querySelectorAll('.strategy-step'))
+    .map((step, i) => {
+      const title = step.querySelector('.step-title').innerText;
+      const body = step.querySelector('.step-body').innerText;
+      return `${i + 1}. ${title}: ${body}`;
     })
+    .join('\n\n');
+
+  const fullText = `EMPIRE STRATEGY: ${winner}\n\n` +
+                   `MESSAGING HOOK: ${hook}\n\n` +
+                   `30-DAY ROADMAP:\n${roadmap}`;
+
+  navigator.clipboard.writeText(fullText).then(() => {
+    alert("Strategy formatted and copied to clipboard.");
+  });
+};
+
+// Global Claude Fetcher
+async function callClaude(sys, user) {
+  const res = await fetch('/api/claude', { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ system: sys, user }) 
   });
   if(!res.ok) throw new Error("API Connection Failed");
   const data = await res.json();
-  let text = data.content[0].text;
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
-  } catch(e) { 
-    throw new Error("AI returned invalid JSON. Try again."); 
-  }
+  const text = data.content[0].text;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
 }
 
 function toggleExportDrawer() { 
