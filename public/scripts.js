@@ -1,73 +1,99 @@
-
 let personas = [];
 let researchData = null;
 let crmContext = "";
 let chipSelections = { geo: ['Global'], ctype: ['Both'], count: ['3'] };
 
+// SAFETY WRAPPER: Get element value or return empty string
+const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
 function toggleChip(el, group) {
-  document.querySelectorAll(`#${group}-chips .chip`).forEach(c => c.classList.remove('selected'));
+  const parent = el.parentElement;
+  if (parent) {
+    parent.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  }
   el.classList.add('selected');
   chipSelections[group] = [el.textContent.trim()];
 }
 
 function handleCSVUpload(event) {
   const file = event.target.files[0];
+  if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
     const rows = e.target.result.split('\n');
-    crmContext = rows.slice(0, 100).join('\n'); // Protect token limit
-    document.getElementById('csv-status').innerText = `✅ ${file.name} Loaded`;
-    document.getElementById('csv-status').style.color = "var(--teal)";
+    crmContext = rows.slice(0, 100).join('\n'); 
+    const statusEl = document.getElementById('csv-status');
+    if (statusEl) {
+      statusEl.innerText = `✅ ${file.name} Loaded`;
+      statusEl.style.color = "#d4a843"; // Gold color
+    }
   };
   reader.readAsText(file);
 }
 
 function showStep(n) {
-  ['step-intake','loading','step-confirm','step-personas'].forEach(id => document.getElementById(id).classList.add('hidden'));
-  const target = [null,'step-intake','loading','step-confirm','step-personas'][n];
-  document.getElementById(target).classList.remove('hidden');
-  for(let i=1; i<=4; i++) {
-    const el = document.getElementById('prog-'+i);
-    const line = document.getElementById('prog-line-'+i);
-    el.classList.remove('active','done');
-    if(i < n) el.classList.add('done');
-    if(i === n) el.classList.add('active');
-    if(line) line.classList.toggle('done', i < n);
-  }
+  const steps = ['step-intake', 'loading', 'step-confirm', 'step-personas'];
+  
+  // Hide all
+  steps.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
+  // Show target
+  const targetId = steps[n - 1];
+  const targetEl = document.getElementById(targetId);
+  if (targetEl) targetEl.classList.remove('hidden');
+
+  // Update Progress Dots (Minimalist Logic)
+  const dots = document.querySelectorAll('.prog-step');
+  dots.forEach((dot, idx) => {
+    dot.classList.remove('active', 'done');
+    if (idx + 1 < n) dot.classList.add('done');
+    if (idx + 1 === n) dot.classList.add('active');
+  });
 }
 
 let loaderInterval;
-const stages = [['RESEARCHING','Mapping landscape...'],['SCANNING','Competitor reviews...'],['ANALYZING','Finding pain points...'],['ENRICHING','Cross-referencing CRM...'],['SYNTHESIZING','Finalizing research...']];
-function startLoader() {
-  showStep(2);
+const stages = [
+  ['RESEARCHING', 'Mapping landscape...'],
+  ['SCANNING', 'Competitor reviews...'],
+  ['ANALYZING', 'Finding pain points...'],
+  ['SYNTHESIZING', 'Finalizing research...']
+];
+
+function startLoader(customStage) {
+  showStep(2); // Show loading step
   let idx = 0;
+  if (loaderInterval) clearInterval(loaderInterval);
+  
   loaderInterval = setInterval(() => {
-    document.querySelectorAll('.loader-step-dot').forEach(d => d.classList.remove('active'));
-    document.getElementById('ldot-'+idx).classList.add('active');
-    document.getElementById('loader-stage').innerText = stages[idx][0];
-    document.getElementById('loader-detail').innerText = stages[idx][1];
+    const stageEl = document.getElementById('loader-stage');
+    const detailEl = document.getElementById('loader-detail');
+    
+    if (stageEl) stageEl.innerText = customStage || stages[idx][0];
+    if (detailEl) detailEl.innerText = stages[idx][1];
+    
     idx = (idx + 1) % stages.length;
   }, 2000);
 }
 
 async function startResearch() {
-  const desc = document.getElementById('biz-description').value.trim();
-  if(!desc) return alert("Description required");
+  const desc = getVal('biz-description');
+  if (!desc) return alert("Description required");
 
   startLoader();
 
   const systemPrompt = `You are a Senior Market Research Analyst. Return valid JSON only. Structure: {"market_overview": "...", "research_sections": [{"source": "...", "findings": ["..."], "relevance": "..."}], "segment_hypotheses": [{"label": "...", "description": "..."}]}`;
+  
+  // Note: Using getVal ensures we don't crash if Edward removed "Competitors" or "Hypothesis" from the UI
   const userPrompt = `
     Business: ${desc}
-    Industry: ${document.getElementById('industry').value}
-    Price: ${document.getElementById('price-point').value}
-    Hypothesis: ${document.getElementById('buyer-hypothesis').value}
+    Industry: ${getVal('industry')}
+    Price: ${getVal('price-point')}
     Geo: ${chipSelections.geo}
-    Competitors: ${document.getElementById('competitors').value}
-    CRM DATA ENRICHMENT: ${crmContext}
-    
-    Research this market. If CRM data is present, highlight contradictions between hypothesis and actual data. Look for "Hidden Winners".`;
+    CRM DATA: ${crmContext}
+    Research this market and highlight "Hidden Winners".`;
 
   try {
     const res = await callClaude(systemPrompt, userPrompt);
@@ -75,7 +101,7 @@ async function startResearch() {
     researchData = res;
     renderResearch(res);
     showStep(3);
-  } catch(e) {
+  } catch (e) {
     clearInterval(loaderInterval);
     alert(e.message);
     showStep(1);
@@ -84,23 +110,42 @@ async function startResearch() {
 
 function renderResearch(data) {
   const container = document.getElementById('research-panels');
-  container.innerHTML = `<div class="card"><div class="card-body"><div class="cell-label">Executive Overview</div>${data.market_overview}</div></div>`;
+  
+  // 1. Clear and Add Executive Overview with a "Glass" look
+  container.innerHTML = `
+    <div style="text-align: left; margin-bottom: 60px; padding: 40px; background: rgba(255,255,255,0.02); border-left: 2px solid var(--gold); border-radius: 0 20px 20px 0;">
+      <div class="field-label" style="color: var(--gold)">Intelligence Synthesis</div>
+      <h2 style="font-family: var(--serif); font-size: 32px; margin-bottom: 20px; text-transform: uppercase;">Executive Overview</h2>
+      <p style="font-size: 18px; line-height: 1.6; font-weight: 300; color: rgba(255,255,255,0.8)">${data.market_overview}</p>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;" id="research-grid"></div>
+  `;
+
+  const grid = document.getElementById('research-grid');
+
+  // 2. Map Findings into a sleek 2-column grid
   data.research_sections.forEach((s, i) => {
-    container.innerHTML += `
-      <div class="research-panel">
-        <div class="research-panel-header" onclick="this.nextElementSibling.classList.toggle('open')">
-          <div style="display:flex;gap:12px;align-items:center">
-            <span class="research-source-tag">${s.source}</span>
-            <span style="font-size:12px;color:var(--muted)">${s.findings.length} findings</span>
-          </div>
-          <span style="color:var(--muted)">↓</span>
+    grid.innerHTML += `
+      <div class="research-card" style="text-align: left; padding: 30px; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(255,255,255,0.01);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+          <span class="field-label" style="margin: 0;">${s.source}</span>
+          <input type="checkbox" id="check-${i}" checked style="accent-color: var(--gold);">
         </div>
-        <div class="research-findings">
-          ${s.findings.map(f => `<div class="research-finding-item"><div class="finding-dot"></div><div>${f}</div></div>`).join('')}
-          <div style="font-size:11px;color:var(--gold);font-family:var(--mono);margin-top:12px">${s.relevance}</div>
+        
+        <ul style="list-style: none; padding: 0; margin-bottom: 20px;">
+          ${s.findings.map(f => `
+            <li style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.6); margin-bottom: 12px; padding-left: 15px; border-left: 1px solid rgba(212,168,67,0.3);">
+              ${f}
+            </li>
+          `).join('')}
+        </ul>
+        
+        <div style="font-size: 10px; font-family: var(--mono); color: var(--gold); opacity: 0.8; letter-spacing: 0.1em; text-transform: uppercase;">
+          Relevance: ${s.relevance}
         </div>
-        <div class="confirm-check"><input type="checkbox" id="check-${i}" checked><label for="check-${i}">Include in Personas</label></div>
-      </div>`;
+      </div>
+    `;
   });
 }
 
@@ -130,33 +175,49 @@ async function buildPersonas() {
 function renderPersonas() {
   const container = document.getElementById('persona-list');
   container.innerHTML = personas.map((p, i) => `
-    <div class="persona-card">
-      <div class="persona-top">
-        <div class="persona-avatar">${p.emoji || '👤'}</div>
-        <div class="persona-identity">
-          <div class="persona-segment" style="color:var(--gold)">${p.segment_name}</div>
-          <input class="editable-name" value="${p.name}">
-          <input class="editable-role" value="${p.role}">
+    <div class="persona-card" style="border-top: 1px solid var(--border); padding-top: 60px; margin-bottom: 100px;">
+      
+      <div class="persona-header" style="margin-bottom: 40px;">
+        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.3em; color: var(--gold); margin-bottom: 8px;">
+          ${p.segment_name || 'Target Segment'}
         </div>
+        <h2 style="font-family: var(--serif); font-size: 48px; text-transform: uppercase; line-height: 1;">
+          ${p.name}
+        </h2>
+        <p style="color: var(--muted); font-size: 16px; margin-top: 8px;">${p.role}</p>
       </div>
-      <div class="persona-grid">
-        <div class="persona-cell full"><div class="cell-label">Summary</div><textarea class="cell-text">${p.summary}</textarea></div>
-        <div class="persona-cell"><div class="cell-label">Job To Be Done</div><textarea class="cell-text">${p.jtbd}</textarea></div>
-        <div class="persona-cell"><div class="cell-label">Goals</div><div class="tag-row">${p.goals.map(g=>`<span class="ptag goal">${g}</span>`).join('')}</div></div>
-        <div class="persona-cell"><div class="cell-label">Pain Points</div><div class="tag-row">${p.pain_points.map(g=>`<span class="ptag pain">${g}</span>`).join('')}</div></div>
-        <div class="persona-cell"><div class="cell-label">Motivations</div><textarea class="cell-text">${p.motivations}</textarea></div>
-        <div class="persona-cell"><div class="cell-label">Buying Triggers</div><textarea class="cell-text">${p.buying_triggers}</textarea></div>
-        <div class="persona-cell"><div class="cell-label">Objections</div><textarea class="cell-text">${p.objections}</textarea></div>
-        <div class="persona-cell"><div class="cell-label">Messaging Angle</div><textarea class="cell-text">${p.messaging_angle}</textarea></div>
-        <div class="persona-cell full"><div class="cell-label">Ad Targeting Notes</div><textarea class="cell-text" style="min-height:40px">${p.ad_targeting_notes}</textarea></div>
+
+      <div class="persona-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px 40px;">
+        
+        <div class="persona-item" style="grid-column: span 2;">
+          <label class="field-label">Executive Summary</label>
+          <div style="font-size: 18px; font-weight: 300; line-height: 1.6; color: rgba(255,255,255,0.8)">${p.summary}</div>
+        </div>
+
+        <div class="persona-item">
+          <label class="field-label">Pain Points</label>
+          <ul style="list-style: none; padding: 0; color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.8;">
+            ${p.pain_points.map(pt => `<li>— ${pt}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="persona-item">
+          <label class="field-label">Messaging Angle</label>
+          <div style="font-size: 14px; line-height: 1.6; color: var(--gold); italic">${p.messaging_angle}</div>
+        </div>
+
       </div>
-      <div class="persona-quote-block">
-        <div class="big-quote">"</div>
-        <textarea class="quote-text">${p.voice_quote}</textarea>
+
+      <div style="margin-top: 60px; padding: 40px; background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px inset rgba(255,255,255,0.05);">
+        <div style="font-family: var(--serif); font-size: 32px; line-height: 1.2; font-style: italic; color: #fff;">
+          "${p.voice_quote}"
+        </div>
       </div>
     </div>
   `).join('');
-  document.getElementById('persona-count-display').innerText = `${personas.length} personas ready`;
+  
+  const countDisplay = document.getElementById('persona-count-display');
+  if (countDisplay) countDisplay.innerText = `${personas.length} Intelligence Profiles Active`;
 }
 
 async function callClaude(sys, user) {
