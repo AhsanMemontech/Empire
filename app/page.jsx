@@ -40,6 +40,15 @@ export default function Home() {
     checkUser();
   }, []);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setView('login');
+    // Optional: Reset steps so it starts fresh next time
+    setOnboardingStep(1); 
+    setDashboardStep(3);
+  };
+
   // Universal Claude Call
   const callClaude = async (sys, userPrompt) => {
     const res = await fetch('/api/claude', { 
@@ -77,6 +86,15 @@ export default function Home() {
       
       {/* GLOBAL HEADER */}
       <div className="header" style={{ marginBottom: '40px' }}>
+        {/* LOGOUT BUTTON */}
+        {/* {user && (
+          <button 
+            onClick={handleLogout} 
+            style={{ position: 'absolute', top: '10', right: '0', background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Log out
+          </button>
+        )} */}
         <div className="header-badge" style={{ marginBottom: '24px', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase' }}>
           Empire — Persona Engine
         </div>

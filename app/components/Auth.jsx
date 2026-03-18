@@ -30,8 +30,7 @@ export default function Auth({ setView, setUser }) {
       if (error) setAuthMessage({ text: error.message, type: 'error' });
       else {
         setUser(data.user);
-        const { data: brand } = await supabase.from('brands').select('id').eq('id', data.user.id).single();
-        setView(brand ? 'dashboard' : 'onboarding');
+        setView('onboarding');
       }
     }
   };
