@@ -20,7 +20,7 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         {children}
-        <Script src="/scripts.js" strategy="afterInteractive" />
+        {/* <Script src="/scripts.js" strategy="afterInteractive" /> */}
       </body>
     </html>
   );
