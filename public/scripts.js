@@ -25,7 +25,7 @@ function handleCSVUpload(event) {
     const statusEl = document.getElementById('csv-status');
     if (statusEl) {
       statusEl.innerText = `✅ ${file.name} Loaded`;
-      statusEl.style.color = "#d4a843"; // Gold color
+      statusEl.style.color = "#0071e3"; // Gold color
     }
   };
   reader.readAsText(file);
@@ -143,10 +143,10 @@ function renderResearch(data) {
   const sections = data.hidden_winners || data.hiddenWinners || data.research_sections || data.sections || [];
 
   container.innerHTML = `
-    <div style="text-align: left; margin-bottom: 60px; padding: 40px; background: rgba(255,255,255,0.02); border-left: 2px solid var(--gold); border-radius: 0 20px 20px 0;">
+    <div style="text-align: left; margin-bottom: 60px; padding: 40px; background: var(--bg-subtle); border-left: 2px solid var(--gold); border-radius: 0 20px 20px 0;">
       <div class="field-label" style="color: var(--gold)">Intelligence Synthesis</div>
       <h2 style="font-family: var(--serif); font-size: 32px; margin-bottom: 20px; text-transform: uppercase;">Empire Executive Overview</h2>
-      <p style="font-size: 18px; line-height: 1.6; font-weight: 300; color: rgba(255,255,255,0.8)">${overview}</p>
+      <p style="font-size: 18px; line-height: 1.6; font-weight: 300; color: var(--text)">${overview}</p>
     </div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;" id="research-grid"></div>
   `;
@@ -170,7 +170,7 @@ function renderResearch(data) {
           <input type="checkbox" id="check-${i}" checked style="accent-color: var(--gold); cursor: pointer; transform: scale(1.3);">
         </div>
         ${valDisplay}
-        <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7); font-weight: 300;">
+        <p style="font-size: 14px; line-height: 1.6; color: var(--text); font-weight: 300;">
           ${detailText}
         </p>
       </div>
@@ -222,19 +222,19 @@ function renderPersonas() {
   }
 
   container.innerHTML = list.map(p => `
-    <div class="persona-card" style="text-align: left; padding: 30px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;">
+    <div class="persona-card" style="text-align: left; padding: 30px; background: var(--bg-subtle); border: 1px solid var(--bg-subtle); border-radius: 16px;">
       <div class="field-label" style="color: var(--gold)">${p.title || p.role || p.type || 'Decision Maker'}</div>
-      <h3 style="font-family: var(--serif); font-size: 24px; margin-bottom: 10px; color: #fff;">${p.name || p.persona_name || 'Executive Profile'}</h3>
-      <p style="font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 20px; line-height: 1.5;">${p.bio || p.summary || p.description || ''}</p>
+      <h3 style="font-family: var(--serif); font-size: 24px; margin-bottom: 10px; color: var(--text);">${p.name || p.persona_name || 'Executive Profile'}</h3>
+      <p style="font-size: 14px; color: var(--text); margin-bottom: 20px; line-height: 1.5;">${p.bio || p.summary || p.description || ''}</p>
       
       <div style="margin-bottom: 20px;">
         <span class="field-label" style="font-size: 10px; opacity: 0.7;">Pain Points</span>
-        <ul style="list-style: none; padding: 0; font-size: 13px; color: rgba(255,255,255,0.7);">
+        <ul style="list-style: none; padding: 0; font-size: 13px; color: var(--text);">
           ${(Array.isArray(p.pain_points || p.challenges) ? (p.pain_points || p.challenges) : []).map(pt => `<li style="margin-bottom: 5px;">• ${pt}</li>`).join('')}
         </ul>
       </div>
 
-      <div style="padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05);">
+      <div style="padding-top: 20px; border-top: 1px solid var(--bg-subtle);">
         <span class="field-label" style="font-size: 10px; opacity: 0.7;">The Hook</span>
         <p style="font-style: italic; font-size: 13px; color: var(--gold);">"${p.hook || p.messaging_angle || p.quote || 'Strategy pending...'}"</p>
       </div>
